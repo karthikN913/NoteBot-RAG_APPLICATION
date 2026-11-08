@@ -49,8 +49,10 @@ venv.bak/
 .coverage
 htmlcov/
 
-# Local documents and uploads (prevents accidental leak of private files)
+# Local documents, vector indexes and uploads (prevents accidental leak of private files)
 *.pdf
+data/
+data/indexes/
 scratch/
 
 # Operating System files
