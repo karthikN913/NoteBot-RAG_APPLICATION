@@ -32,3 +32,5 @@ def clean_pdf_text(text: str) -> str:
     text = re.sub(r'\n{3,}', '\n\n', text)
 
     return text.strip()
+
+ 

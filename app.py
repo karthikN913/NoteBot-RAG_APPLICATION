@@ -223,18 +223,18 @@ with st.sidebar:
     embed_choice = st.selectbox(
         "Embedding Provider",
         options=[
-            "Google Gemini (text-embedding-004)",
-            "OpenAI (text-embedding-3-small)",
-            "FastEmbed (Local Offline - Zero Cost)"
+            "Google Gemini (gemini-embedding-001 / embedding-001)",
+            "FastEmbed (Local Offline - Zero Cost & Highly Reliable)",
+            "OpenAI (text-embedding-3-small)"
         ],
-        index=0 if selected_llm_provider == PROVIDER_GOOGLE else (2 if selected_llm_provider in [PROVIDER_GROQ, PROVIDER_OPENROUTER] else 1),
+        index=0 if selected_llm_provider == PROVIDER_GOOGLE else (1 if selected_llm_provider in [PROVIDER_GROQ, PROVIDER_OPENROUTER] else 2),
         help="Embeddings can be selected completely independently of your LLM provider."
     )
 
     embed_provider_map = {
         "Google Gemini": EMBED_GOOGLE,
-        "OpenAI": EMBED_OPENAI,
-        "FastEmbed": EMBED_FASTEMBED
+        "FastEmbed": EMBED_FASTEMBED,
+        "OpenAI": EMBED_OPENAI
     }
     selected_embed_provider = next(v for k, v in embed_provider_map.items() if embed_choice.startswith(k))
 
@@ -248,6 +248,9 @@ with st.sidebar:
             help="API Key used for generating document embeddings."
         )
         embed_api_key = embed_key_input.strip() if embed_key_input else None
+        # Fallback to LLM key if same provider
+        if not embed_api_key and selected_llm_provider == selected_embed_provider:
+            embed_api_key = llm_api_key
 
     st.markdown("---")
     st.header("🔍 Retrieval & Ingestion Settings")

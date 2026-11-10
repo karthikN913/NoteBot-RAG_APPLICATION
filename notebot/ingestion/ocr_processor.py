@@ -62,3 +62,4 @@ def ocr_page_images(page_obj) -> Tuple[str, Optional[str]]:
         if "tesseract is not installed" in err_msg.lower() or "tesseract_cmd" in err_msg.lower():
             return "", "Tesseract-OCR engine binary is not installed or not found in system PATH."
         return "", f"OCR extraction error: {err_msg}"
+

@@ -137,3 +137,4 @@ def ingest_documents(
 
     result.total_characters = sum(len(d.page_content) for d in result.documents)
     return result
+

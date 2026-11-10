@@ -75,3 +75,4 @@ def chunk_documents(
 
     logger.info(f"Created {len(all_chunks)} chunks from {len(documents)} page documents.")
     return all_chunks
+

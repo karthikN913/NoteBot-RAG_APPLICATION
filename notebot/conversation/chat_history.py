@@ -46,3 +46,4 @@ class ChatHistoryManager:
     def get_messages(self) -> List[Dict[str, Any]]:
         """Returns the full message list."""
         return self.messages
+

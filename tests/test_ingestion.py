@@ -59,3 +59,4 @@ def test_load_corrupted_pdf():
     assert len(docs) == 0
     assert err is not None
     assert "corrupted" in err.lower() or "invalid" in err.lower()
+

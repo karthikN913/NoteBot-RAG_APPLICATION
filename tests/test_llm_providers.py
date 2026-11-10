@@ -56,3 +56,4 @@ def test_classify_api_error():
     # 404 Model not found
     msg = classify_api_error(Exception("404 NOT_FOUND: models/gemini-1.5-pro is not found"))
     assert "404" in msg or "model" in msg.lower()
+

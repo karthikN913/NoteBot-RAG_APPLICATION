@@ -90,3 +90,4 @@ class NoteBotRetriever:
             return self.reranker.rerank(query=query, documents=candidate_docs, top_n=top_k)
 
         return candidate_docs[:top_k]
+

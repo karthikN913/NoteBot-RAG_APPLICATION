@@ -59,3 +59,4 @@ def test_notebot_unified_retriever(sample_documents, mock_embeddings):
     # Test hybrid mode
     hyb_docs = retriever.retrieve("reinforcement agent", top_k=2, mode="hybrid")
     assert len(hyb_docs) == 2
+

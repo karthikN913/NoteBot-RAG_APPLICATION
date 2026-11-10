@@ -65,3 +65,4 @@ class Reranker:
         except Exception as e:
             logger.warning(f"FlashRank reranking failed ({e}); falling back to retriever order.")
             return documents[:top_n]
+

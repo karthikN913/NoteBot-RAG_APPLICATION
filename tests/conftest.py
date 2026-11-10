@@ -52,3 +52,4 @@ def sample_documents() -> List[Document]:
             metadata={"source": "Deep_Learning.pdf", "page": 1, "chunk_id": "Deep_Learning_p1_c0"}
         )
     ]
+

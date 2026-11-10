@@ -44,3 +44,4 @@ def test_resolve_search_query_heuristic_independent_query():
     # Independent query should NOT be contaminated with prior chat history
     resolved = resolve_search_query_heuristic(history, "Explain cellular respiration in biology.")
     assert resolved == "Explain cellular respiration in biology."
+

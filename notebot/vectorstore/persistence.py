@@ -129,3 +129,4 @@ def list_saved_indexes(storage_dir: str) -> List[Dict[str, Any]]:
                 "metadata": meta or {}
             })
     return indexes
+

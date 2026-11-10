@@ -62,4 +62,5 @@ def test_compute_dataset_hash():
     files_a = [{"name": "doc1.pdf", "size": 1000}, {"name": "doc2.pdf", "size": 2000}]
     files_b = [{"name": "doc2.pdf", "size": 2000}, {"name": "doc1.pdf", "size": 1000}]
     # Order independence
-    assert compute_dataset_hash(files_a, "google_text-embedding-004") == compute_dataset_hash(files_b, "google_text-embedding-004")
+    assert compute_dataset_hash(files_a, "google_gemini-embedding-001") == compute_dataset_hash(files_b, "google_gemini-embedding-001")
+

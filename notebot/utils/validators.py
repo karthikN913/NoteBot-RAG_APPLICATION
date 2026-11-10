@@ -41,3 +41,4 @@ def sanitize_user_query(query: str) -> str:
     # Strip null bytes and non-printable control characters
     cleaned = "".join(ch for ch in query if ch.isprintable() or ch in ("\n", "\t"))
     return cleaned.strip()
+

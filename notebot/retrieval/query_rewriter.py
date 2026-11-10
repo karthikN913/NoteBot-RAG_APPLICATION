@@ -120,3 +120,4 @@ def rewrite_query_with_llm(
         logger.warning(f"LLM query rewriting failed ({e}); falling back to heuristic.")
 
     return resolve_search_query_heuristic(history, query)
+

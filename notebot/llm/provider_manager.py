@@ -141,3 +141,4 @@ def classify_api_error(error: Exception) -> str:
         return "❌ **Network Connection Error**: Unable to reach the provider servers. Please verify your internet connection."
 
     return f"❌ **Inference Error**: {str(error)}"
+

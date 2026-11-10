@@ -4,7 +4,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B.svg)](https://streamlit.io/)
 [![LangChain](https://img.shields.io/badge/LangChain-1.0+-green.svg)](https://www.langchain.com/)
 [![FAISS](https://img.shields.io/badge/VectorStore-FAISS-purple.svg)](https://github.com/facebookresearch/faiss)
-[![Tests: Pytest](https://img.shields.io/badge/Tests-22%20Passed-brightgreen.svg)](https://pytest.org/)
+[![Tests: Pytest](https://img.shields.io/badge/Tests-25%20Passed-brightgreen.svg)](https://pytest.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **NoteBot** is a production-grade, modular Retrieval-Augmented Generation (RAG) platform and conversational academic intelligence assistant. Engineered for university students, researchers, and technical professionals, NoteBot transforms complex textbooks, technical papers, and course notes into an interactive, pedagogical tutoring session with verified citations and zero hallucination.
@@ -14,7 +14,7 @@
 ## 🌟 Key Capabilities & Architectural Highlights
 
 - 📚 **Multi-PDF Document Ingestion**: Ingests multiple PDF documents concurrently, preserving page numbers, document names, and chunk metadata across the entire corpus.
-- 🧠 **Decoupled Embedding Architecture**: Allows independent configuration of embedding models (Google Gemini `text-embedding-004`, OpenAI `text-embedding-3-small`, or **100% Free Offline FastEmbed**) from your inference LLM.
+- 🧠 **Decoupled Embedding Architecture**: Allows independent configuration of embedding models (Google Gemini `gemini-embedding-001` / `embedding-001`, OpenAI `text-embedding-3-small`, or **100% Free Offline FastEmbed**) from your inference LLM.
 - ⚡ **Multi-Provider LLM Orchestration**: Native support for **Google Gemini**, **OpenAI**, **Groq**, and **OpenRouter** with strict key isolation and automatic multi-model fallback hierarchies.
 - 🔍 **Tri-Mode Retrieval System**:
   - **Dense Vector Similarity**: Fast, high-recall vector search using FAISS.
@@ -24,7 +24,7 @@
 - 💾 **Persistent Vector Index Storage**: Automatically serializes FAISS indexes and metadata to disk using content hashing. Reloads previously indexed document sets in **0ms** without re-embedding.
 - 💬 **Contextual Conversational Memory**: Resolves pronouns and ambiguous follow-up queries using conversational anchor heuristics and contextual rewriting.
 - 🛡️ **Grounded Citations & Zero Hallucination**: Instructs the model to synthesize explanations rather than copying raw text, binding facts to `[Doc: <file>, Page: <page>]` citation badges with verification checks.
-- 🧪 **Enterprise Test Suite**: 22 unit and integration tests executing in under 4 seconds with 100% offline mocked fixtures (zero API cost).
+- 🧪 **Enterprise Test Suite**: 25 unit and integration tests executing with 100% offline mocked fixtures (zero API cost).
 
 ---
 

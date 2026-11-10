@@ -81,3 +81,4 @@ def reciprocal_rank_fusion(
     # Sort descending by fused RRF score
     sorted_doc_ids = sorted(scores.keys(), key=lambda did: scores[did], reverse=True)
     return [doc_map[did] for did in sorted_doc_ids[:top_n]]
+

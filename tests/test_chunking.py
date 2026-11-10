@@ -47,3 +47,4 @@ def test_chunk_deduplication():
 def test_chunk_empty_input():
     chunks = chunk_documents([], chunk_size=500, chunk_overlap=50)
     assert chunks == []
+

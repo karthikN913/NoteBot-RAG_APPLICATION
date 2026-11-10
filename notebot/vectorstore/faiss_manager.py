@@ -104,3 +104,4 @@ class FAISSIndexManager:
             if src:
                 sources.add(src)
         return sorted(list(sources))
+

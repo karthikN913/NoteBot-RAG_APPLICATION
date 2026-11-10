@@ -39,3 +39,4 @@ def setup_logger(name: str = "notebot", level: int = logging.INFO) -> logging.Lo
         logger.addHandler(handler)
         logger.propagate = False
     return logger
+

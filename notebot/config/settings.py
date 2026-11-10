@@ -73,9 +73,12 @@ DEFAULT_LLM_MODELS: Dict[str, List[str]] = {
 # Embedding Model Defaults
 DEFAULT_EMBED_MODELS: Dict[str, List[str]] = {
     EMBED_GOOGLE: [
-        "text-embedding-004",
         "gemini-embedding-001",
+        "embedding-001",
+        "models/gemini-embedding-001",
+        "models/embedding-001",
         "gemini-embedding-2",
+        "text-embedding-004",
     ],
     EMBED_OPENAI: [
         "text-embedding-3-small",
@@ -165,3 +168,4 @@ class AppConfig:
 
     # Persistence Settings
     index_storage_dir: str = "data/indexes"
+
