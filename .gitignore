@@ -53,6 +53,7 @@ htmlcov/
 *.pdf
 data/
 data/indexes/
+uploaded_docs/
 scratch/
 
 # Operating System files

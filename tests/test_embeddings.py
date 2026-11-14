@@ -40,3 +40,4 @@ def test_resilient_google_embeddings_fallback_on_404():
         assert len(res) == 1
         assert len(res[0]) > 0
         assert resilient.active_model_name == "fastembed-offline-fallback"
+

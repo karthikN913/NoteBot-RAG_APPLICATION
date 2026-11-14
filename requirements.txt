@@ -6,7 +6,7 @@ langchain-community>=0.0.20
 langchain-text-splitters>=0.0.1
 langchain-google-genai>=2.0.0
 langchain-groq>=0.1.0
-# faiss-cpu removed – fallback implementation used on Windows
+faiss-cpu>=1.7.4
 
 openai>=1.10.0
 google-genai>=1.0.0

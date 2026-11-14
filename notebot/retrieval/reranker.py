@@ -1,5 +1,7 @@
 """Reranking Engine for NoteBot using FlashRank Cross-Encoder."""
 
+import os
+import tempfile
 from typing import List, Optional
 from langchain_core.documents import Document
 from notebot.config.logging_config import setup_logger
@@ -21,7 +23,8 @@ class Reranker:
         self._ranker = None
         if HAS_FLASHRANK:
             try:
-                self._ranker = Ranker(model_name=model_name, cache_dir="/tmp/flashrank")
+                cache_dir = os.path.join(tempfile.gettempdir(), "flashrank")
+                self._ranker = Ranker(model_name=model_name, cache_dir=cache_dir)
                 logger.info(f"Initialized FlashRank model: {model_name}")
             except Exception as e:
                 logger.warning(f"Could not initialize FlashRank: {e}")

@@ -1,11 +1,15 @@
 # NoteBot — Advanced Conversational RAG Application
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://notebot-nawregcmah9drjgvqegeai.streamlit.app/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B.svg)](https://streamlit.io/)
 [![LangChain](https://img.shields.io/badge/LangChain-1.0+-green.svg)](https://www.langchain.com/)
 [![FAISS](https://img.shields.io/badge/VectorStore-FAISS-purple.svg)](https://github.com/facebookresearch/faiss)
 [![Tests: Pytest](https://img.shields.io/badge/Tests-25%20Passed-brightgreen.svg)](https://pytest.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> 🚀 **Live Public URL**: [https://notebot-nawregcmah9drjgvqegeai.streamlit.app/](https://notebot-nawregcmah9drjgvqegeai.streamlit.app/) — Bring your own API key (Gemini, OpenAI, Groq, or OpenRouter) and start querying your documents instantly with zero setup.
+
 
 **NoteBot** is a production-grade, modular Retrieval-Augmented Generation (RAG) platform and conversational academic intelligence assistant. Engineered for university students, researchers, and technical professionals, NoteBot transforms complex textbooks, technical papers, and course notes into an interactive, pedagogical tutoring session with verified citations and zero hallucination.
 

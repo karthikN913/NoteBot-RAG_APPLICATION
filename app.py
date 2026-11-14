@@ -156,8 +156,24 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 # Session State Initialization
 # ---------------------------------------------------------------------------
+import uuid
+
+# Initialize a unique session identifier (used for isolated upload/index folders)
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+# Helper to get a per‑session directory inside the repo (ephemeral but isolated)
+def get_session_dir(subfolder: str) -> str:
+    base = os.path.join(os.getcwd(), subfolder, st.session_state.session_id)
+    os.makedirs(base, exist_ok=True)
+    return base
+
+# Ensure chat manager exists after session ID is set
 if "chat_manager" not in st.session_state:
     st.session_state.chat_manager = ChatHistoryManager()
+
+if "user_keys" not in st.session_state:
+    st.session_state.user_keys = {}
 
 if "indexed_dataset_hash" not in st.session_state:
     st.session_state.indexed_dataset_hash = None
@@ -196,25 +212,39 @@ with st.sidebar:
     }
     selected_llm_provider = next(v for k, v in provider_map.items() if llm_choice.startswith(k))
 
-    # Strict key retrieval: only designated key for this provider
-    default_env_key = get_provider_api_key(selected_llm_provider) or ""
+    # Direct provider instructions and portal links
+    provider_links = {
+        PROVIDER_GOOGLE: ("Google Gemini", "https://aistudio.google.com/app/apikey", "Free tier available"),
+        PROVIDER_OPENAI: ("OpenAI", "https://platform.openai.com/api-keys", "Pay-as-you-go"),
+        PROVIDER_GROQ: ("Groq", "https://console.groq.com/keys", "Ultra-fast free inference"),
+        PROVIDER_OPENROUTER: ("OpenRouter", "https://openrouter.ai/keys", "Multi-model access"),
+    }
+    p_name, p_url, p_tier = provider_links.get(selected_llm_provider, (selected_llm_provider.title(), "", ""))
+
+    # Retrieve key: user session input > environment variable > Streamlit secrets
+    cached_user_key = st.session_state.user_keys.get(selected_llm_provider)
+    default_env_key = cached_user_key or get_provider_api_key(selected_llm_provider) or ""
+
     llm_api_key_input = st.text_input(
-        f"Enter {selected_llm_provider.title()} API Key",
+        f"Enter Your {p_name} API Key",
         value=default_env_key,
         type="password",
-        help=f"Paste your API key designated strictly for {selected_llm_provider.title()}."
+        key=f"input_key_{selected_llm_provider}",
+        help=f"Paste your personal {p_name} API key. Never shared or stored across sessions."
     )
     llm_api_key = llm_api_key_input.strip() if llm_api_key_input else None
 
-    # Key validation
+    # Cache user key in session state
     if llm_api_key:
+        st.session_state.user_keys[selected_llm_provider] = llm_api_key
         is_valid, err_reason = validate_provider_key(selected_llm_provider, llm_api_key)
         if not is_valid:
             st.warning(f"⚠️ {err_reason}")
         else:
-            st.success(f"✅ {selected_llm_provider.title()} API Key Ready")
+            st.success(f"✅ {p_name} API Key Ready")
     else:
-        st.warning(f"⚠️ API Key required for {selected_llm_provider.title()}.")
+        st.markdown(f"<small>👉 Get your key at [{p_url}]({p_url}) ({p_tier})</small>", unsafe_allow_html=True)
+        st.warning(f"⚠️ API Key required for {p_name}.")
 
     st.markdown("---")
     st.header("🧠 Embedding Configuration")
@@ -223,33 +253,43 @@ with st.sidebar:
     embed_choice = st.selectbox(
         "Embedding Provider",
         options=[
-            "Google Gemini (gemini-embedding-001 / embedding-001)",
             "FastEmbed (Local Offline - Zero Cost & Highly Reliable)",
+            "Google Gemini (gemini-embedding-001 / embedding-001)",
             "OpenAI (text-embedding-3-small)"
         ],
-        index=0 if selected_llm_provider == PROVIDER_GOOGLE else (1 if selected_llm_provider in [PROVIDER_GROQ, PROVIDER_OPENROUTER] else 2),
-        help="Embeddings can be selected completely independently of your LLM provider."
+        index=0 if selected_llm_provider in [PROVIDER_GROQ, PROVIDER_OPENROUTER] else (1 if selected_llm_provider == PROVIDER_GOOGLE else 2),
+        help="FastEmbed runs offline on CPU at 100% zero cost. Or select a cloud embedding provider."
     )
 
     embed_provider_map = {
-        "Google Gemini": EMBED_GOOGLE,
         "FastEmbed": EMBED_FASTEMBED,
+        "Google Gemini": EMBED_GOOGLE,
         "OpenAI": EMBED_OPENAI
     }
     selected_embed_provider = next(v for k, v in embed_provider_map.items() if embed_choice.startswith(k))
 
     embed_api_key = None
-    if selected_embed_provider != EMBED_FASTEMBED:
-        embed_default_key = get_provider_api_key(selected_embed_provider) or (llm_api_key if selected_llm_provider == selected_embed_provider else "")
+    if selected_embed_provider == EMBED_FASTEMBED:
+        st.caption("⚡ **FastEmbed Active:** Runs 100% offline on CPU. Zero API cost and no rate limits.")
+    else:
+        # Check if user already provided key for this provider
+        cached_embed_key = (
+            llm_api_key if selected_llm_provider == selected_embed_provider
+            else st.session_state.user_keys.get(selected_embed_provider)
+            or get_provider_api_key(selected_embed_provider)
+            or ""
+        )
         embed_key_input = st.text_input(
             f"{selected_embed_provider.title()} Embedding Key",
-            value=embed_default_key,
+            value=cached_embed_key,
             type="password",
-            help="API Key used for generating document embeddings."
+            key=f"input_embed_key_{selected_embed_provider}",
+            help=f"API Key for {selected_embed_provider.title()} embeddings."
         )
         embed_api_key = embed_key_input.strip() if embed_key_input else None
-        # Fallback to LLM key if same provider
-        if not embed_api_key and selected_llm_provider == selected_embed_provider:
+        if embed_api_key:
+            st.session_state.user_keys[selected_embed_provider] = embed_api_key
+        elif selected_llm_provider == selected_embed_provider:
             embed_api_key = llm_api_key
 
     st.markdown("---")
@@ -298,8 +338,20 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 if not llm_api_key:
     st.info(
-        "👈 Please provide your API key in the sidebar to get started.\n\n"
-        "💡 **Need a free key?** You can get a free Google Gemini key at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)."
+        "👈 **Welcome to NoteBot!** Please enter your API key in the sidebar to get started.\n\n"
+        "💡 **Need an API Key?**\n"
+        "- **Google Gemini (Recommended):** Free tier at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)\n"
+        "- **Groq:** Ultra-fast free inference at [console.groq.com/keys](https://console.groq.com/keys)\n"
+        "- **OpenAI:** [platform.openai.com/api-keys](https://platform.openai.com/api-keys)\n"
+        "- **OpenRouter:** [openrouter.ai/keys](https://openrouter.ai/keys)\n\n"
+        "🔒 *Your API key stays strictly in your private session memory and is never shared, stored, or committed.*"
+    )
+    st.stop()
+
+if selected_embed_provider != EMBED_FASTEMBED and not embed_api_key:
+    st.warning(
+        f"👈 Please enter an API key for {selected_embed_provider.title()} embeddings in the sidebar, "
+        "or select **FastEmbed (Local Offline)** which is 100% free and requires no key."
     )
     st.stop()
 
@@ -323,7 +375,7 @@ if uploaded_files:
     embed_signature = f"{selected_embed_provider}_{chunk_size}_{chunk_overlap}"
     dataset_hash = compute_dataset_hash(files_info, embed_signature)
 
-    storage_dir = os.path.join(os.path.dirname(__file__), "data", "indexes")
+    storage_dir = get_session_dir(os.path.join("data", "indexes"))
 
     # Check if index needs rebuilding or can be loaded from persistence/memory
     if st.session_state.indexed_dataset_hash != dataset_hash:
