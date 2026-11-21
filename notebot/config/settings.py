@@ -38,7 +38,7 @@ PROVIDER_ENV_VARS: Dict[str, List[str]] = {
 
 # Provider Display Names & Helper Metadata
 PROVIDER_DISPLAY_NAMES: Dict[str, str] = {
-    PROVIDER_GOOGLE: "Google Gemini (gemini-1.5-flash / gemini-2.0-flash)",
+    PROVIDER_GOOGLE: "Google Gemini (gemini-2.5-flash / gemini-2.0-flash / gemini-1.5-flash)",
     PROVIDER_OPENAI: "OpenAI (gpt-4o-mini)",
     PROVIDER_GROQ: "Groq (llama-3.3-70b-versatile)",
     PROVIDER_OPENROUTER: "OpenRouter (meta-llama/llama-3.3-70b)",
@@ -47,8 +47,12 @@ PROVIDER_DISPLAY_NAMES: Dict[str, str] = {
 # Default Model Hierarchies for LLMs (Fastest, capable production models first)
 DEFAULT_LLM_MODELS: Dict[str, List[str]] = {
     PROVIDER_GOOGLE: [
-        "gemini-1.5-flash",
+        "gemini-2.5-flash",
         "gemini-2.0-flash",
+        "gemini-flash-latest",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
+        "gemini-2.5-pro",
         "gemini-1.5-pro",
     ],
     PROVIDER_OPENAI: [

@@ -50,7 +50,8 @@ from notebot.retrieval.query_rewriter import resolve_search_query_heuristic
 from notebot.retrieval.retriever import NoteBotRetriever
 from notebot.llm.provider_manager import (
     validate_provider_key,
-    classify_api_error
+    classify_api_error,
+    get_available_gemini_models
 )
 from notebot.llm.response_generator import (
     stream_rag_response,
@@ -242,15 +243,6 @@ with st.sidebar:
     }
     selected_llm_provider = next(v for k, v in provider_map.items() if llm_choice.startswith(k))
 
-    # Fast Model Selector
-    available_models = DEFAULT_LLM_MODELS.get(selected_llm_provider, ["default"])
-    selected_llm_model = st.selectbox(
-        "Model Version",
-        options=available_models,
-        index=0,
-        help="Select the exact model for inference. Defaults to the fastest verified production model."
-    )
-
     # Direct provider instructions and portal links
     provider_links = {
         PROVIDER_GOOGLE: ("Google Gemini", "https://aistudio.google.com/app/apikey", "Free tier available"),
@@ -272,6 +264,19 @@ with st.sidebar:
         help=f"Paste your personal {p_name} API key. Never shared or stored across sessions."
     )
     llm_api_key = llm_api_key_input.strip() if llm_api_key_input else None
+
+    # Model Version Selector (Dynamically discovered from provider API when key is present, with resilient static fallback)
+    if selected_llm_provider == PROVIDER_GOOGLE and llm_api_key:
+        available_models = get_available_gemini_models(llm_api_key)
+    else:
+        available_models = DEFAULT_LLM_MODELS.get(selected_llm_provider, ["default"])
+
+    selected_llm_model = st.selectbox(
+        "Model Version",
+        options=available_models,
+        index=0,
+        help="Select the exact model for inference. Defaults to the fastest verified production model."
+    )
 
     # Cache user key in session state
     if llm_api_key:

@@ -63,6 +63,64 @@ def validate_provider_key(provider: str, key: Optional[str]) -> Tuple[bool, Opti
 
 # In-memory thread-safe client cache to avoid recreating HTTP sessions & TLS handshakes per turn
 _LLM_CLIENT_CACHE = {}
+_DISCOVERED_GEMINI_MODELS = {}
+
+
+def get_available_gemini_models(api_key: Optional[str] = None) -> List[str]:
+    """Dynamically queries the Google Gemini API to discover supported models for this specific API key.
+    Caches results per API key hash. If discovery fails or key is missing, falls back to the robust static hierarchy.
+    """
+    if not api_key or not api_key.strip():
+        return DEFAULT_LLM_MODELS[PROVIDER_GOOGLE]
+
+    k = api_key.strip()
+    key_hash = hashlib.sha256(k.encode("utf-8")).hexdigest()
+    if key_hash in _DISCOVERED_GEMINI_MODELS:
+        return _DISCOVERED_GEMINI_MODELS[key_hash]
+
+    discovered = []
+    try:
+        from google.genai.client import Client
+        client = Client(api_key=k)
+        for m in client.models.list():
+            name = m.name or ""
+            clean_name = name.replace("models/", "").strip()
+            # Filter for text generation models
+            actions = getattr(m, "supported_actions", []) or []
+            if actions:
+                supports_gen = any("generateContent" in a or "generate_content" in a for a in actions)
+            else:
+                supports_gen = "gemini" in clean_name.lower() and "embedding" not in clean_name.lower()
+
+            if supports_gen and clean_name and clean_name not in discovered:
+                discovered.append(clean_name)
+    except Exception as e:
+        logger.warning(f"Dynamic Gemini model discovery encountered ({e}); using static hierarchy.")
+
+    if discovered:
+        # Sort priority: flash models first, then pro models
+        def model_priority(name: str):
+            n = name.lower()
+            if "2.5-flash" in n:
+                return 0
+            if "2.0-flash" in n:
+                return 1
+            if "flash-latest" in n:
+                return 2
+            if "flash" in n:
+                return 3
+            if "2.5-pro" in n:
+                return 4
+            if "pro" in n:
+                return 5
+            return 10
+
+        discovered.sort(key=model_priority)
+        _DISCOVERED_GEMINI_MODELS[key_hash] = discovered
+        logger.info(f"Dynamically discovered {len(discovered)} active Gemini models for API key.")
+        return discovered
+
+    return DEFAULT_LLM_MODELS[PROVIDER_GOOGLE]
 
 
 def get_llm_instance(
@@ -94,7 +152,7 @@ def get_llm_instance(
             max_output_tokens=max_tokens,
             streaming=streaming,
             timeout=30.0,
-            max_retries=2
+            max_retries=1
         )
 
     elif prov == PROVIDER_GROQ:

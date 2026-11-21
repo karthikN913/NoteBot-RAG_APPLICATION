@@ -57,3 +57,54 @@ def test_classify_api_error():
     msg = classify_api_error(Exception("404 NOT_FOUND: models/gemini-1.5-pro is not found"))
     assert "404" in msg or "model" in msg.lower()
 
+
+def test_get_available_gemini_models():
+    from notebot.llm.provider_manager import get_available_gemini_models
+    # Without key, returns static hierarchy
+    models = get_available_gemini_models()
+    assert len(models) >= 3
+    assert any("flash" in m for m in models)
+
+
+def test_stream_rag_response_resilient_fallback_on_404(monkeypatch):
+    """Verifies that if the preferred model throws a 404 NOT_FOUND,
+    stream_rag_response automatically tries the next candidate in the hierarchy.
+    """
+    from notebot.llm.response_generator import stream_rag_response
+    from langchain_core.documents import Document
+    from langchain_core.messages import AIMessage
+    from langchain_core.runnables import RunnableLambda
+
+    attempted_models = []
+
+    def mock_get_llm_instance(provider, model_name, key, **kwargs):
+        attempted_models.append(model_name)
+        if model_name == "gemini-1.5-flash":
+            def failing_func(prompt_val):
+                raise Exception("404 NOT_FOUND: models/gemini-1.5-flash is not found")
+            return RunnableLambda(failing_func)
+        else:
+            def working_func(prompt_val):
+                yield AIMessage(content="Grounded pedagogical explanation")
+            return RunnableLambda(working_func)
+
+    monkeypatch.setattr("notebot.llm.response_generator.get_llm_instance", mock_get_llm_instance)
+
+    sample_doc = Document(page_content="Photosynthesis converts light into chemical energy.", metadata={"source": "bio.pdf", "page": 1})
+    generator = stream_rag_response(
+        provider=PROVIDER_GOOGLE,
+        api_key="AIzaSyFakeKey12345",
+        query="What is photosynthesis?",
+        documents=[sample_doc],
+        chat_history=[],
+        model_override="gemini-1.5-flash"
+    )
+
+    tokens = list(generator)
+    assert len(tokens) > 0
+    assert "Grounded" in tokens[0]
+    # Verify gemini-1.5-flash was attempted first, failed with 404, and automatically fell back to the next model
+    assert attempted_models[0] == "gemini-1.5-flash"
+    assert len(attempted_models) >= 2
+
+

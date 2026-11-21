@@ -101,7 +101,14 @@ def stream_rag_response(
 
     context_str = format_context_for_prompt(documents)
 
-    models_to_try = [model_override] if model_override else DEFAULT_LLM_MODELS.get(provider.lower(), [])
+    # Resilient model resolution: user preferred model first, with automatic hierarchy fallback on 404/failure
+    hierarchy = DEFAULT_LLM_MODELS.get(provider.lower(), ["gpt-4o-mini"])
+    models_to_try = []
+    if model_override and model_override.strip():
+        models_to_try.append(model_override.strip())
+    for m in hierarchy:
+        if m not in models_to_try:
+            models_to_try.append(m)
     if not models_to_try:
         models_to_try = ["gpt-4o-mini"]
 
@@ -129,11 +136,11 @@ def stream_rag_response(
             first_chunk = next(stream_gen, None)
             if first_chunk is not None:
                 active_stream = (first_chunk, stream_gen)
-                logger.info(f"Streaming initialized with {provider} ({mod})")
+                logger.info(f"Streaming successfully initialized with {provider} ({mod})")
                 break
         except Exception as e:
             last_err = e
-            logger.warning(f"Model {mod} failed ({e}); attempting next in hierarchy.")
+            logger.warning(f"Model '{mod}' failed ({e}); automatically attempting next candidate in hierarchy.")
             continue
 
     if active_stream is None:
