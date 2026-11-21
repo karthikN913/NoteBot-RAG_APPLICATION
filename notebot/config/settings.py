@@ -38,20 +38,18 @@ PROVIDER_ENV_VARS: Dict[str, List[str]] = {
 
 # Provider Display Names & Helper Metadata
 PROVIDER_DISPLAY_NAMES: Dict[str, str] = {
-    PROVIDER_GOOGLE: "Google Gemini (gemini-2.5-flash / gemini-flash-latest)",
+    PROVIDER_GOOGLE: "Google Gemini (gemini-1.5-flash / gemini-2.0-flash)",
     PROVIDER_OPENAI: "OpenAI (gpt-4o-mini)",
     PROVIDER_GROQ: "Groq (llama-3.3-70b-versatile)",
     PROVIDER_OPENROUTER: "OpenRouter (meta-llama/llama-3.3-70b)",
 }
 
-# Default Model Hierarchies for LLMs
+# Default Model Hierarchies for LLMs (Fastest, capable production models first)
 DEFAULT_LLM_MODELS: Dict[str, List[str]] = {
     PROVIDER_GOOGLE: [
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-        "gemini-2.5-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-2.5-pro",
+        "gemini-1.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-pro",
     ],
     PROVIDER_OPENAI: [
         "gpt-4o-mini",
@@ -73,12 +71,9 @@ DEFAULT_LLM_MODELS: Dict[str, List[str]] = {
 # Embedding Model Defaults
 DEFAULT_EMBED_MODELS: Dict[str, List[str]] = {
     EMBED_GOOGLE: [
+        "models/text-embedding-004",
         "gemini-embedding-001",
         "embedding-001",
-        "models/gemini-embedding-001",
-        "models/embedding-001",
-        "gemini-embedding-2",
-        "text-embedding-004",
     ],
     EMBED_OPENAI: [
         "text-embedding-3-small",

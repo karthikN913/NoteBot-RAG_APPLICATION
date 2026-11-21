@@ -5,7 +5,11 @@ Production RAG Application with Multi-PDF Support, Hybrid Search, MMR, Reranking
 import io
 import html
 import os
+import time
+import hashlib
+from typing import List, Tuple, Optional
 import streamlit as st
+from langchain_core.documents import Document
 
 # Load environment variables from .env file
 try:
@@ -24,11 +28,12 @@ from notebot.config.settings import (
     EMBED_OPENAI,
     EMBED_FASTEMBED,
     PROVIDER_DISPLAY_NAMES,
+    DEFAULT_LLM_MODELS,
     get_provider_api_key
 )
 from notebot.config.logging_config import setup_logger
 from notebot.utils.validators import validate_uploaded_file, sanitize_user_query
-from notebot.ingestion.pdf_loader import ingest_documents
+from notebot.ingestion.pdf_loader import ingest_documents, load_single_pdf
 from notebot.chunking.chunker import chunk_documents
 from notebot.embeddings.embedding_manager import get_embedding_model
 from notebot.vectorstore.faiss_manager import FAISSIndexManager
@@ -54,6 +59,31 @@ from notebot.llm.response_generator import (
 from notebot.conversation.chat_history import ChatHistoryManager, DEFAULT_WELCOME_MESSAGE
 
 logger = setup_logger("notebot.app")
+
+
+# ---------------------------------------------------------------------------
+# Caching Helpers: Multi-tenant safe, isolated by user key hash & content hash
+# ---------------------------------------------------------------------------
+
+@st.cache_resource(show_spinner=False)
+def get_cached_embedding_model(provider: str, key_hash: str, key: Optional[str], model_name: Optional[str] = None):
+    """Caches embedding model instances per user key hash to prevent reloading and cross-user leaks."""
+    return get_embedding_model(provider=provider, key=key, model_name=model_name, allow_offline_fallback=True)
+
+
+@st.cache_data(show_spinner=False)
+def extract_and_chunk_pdf_bytes(
+    file_bytes: bytes,
+    file_name: str,
+    enable_ocr: bool,
+    chunk_size: int,
+    chunk_overlap: int
+) -> List[Document]:
+    """Deterministically extracts and chunks PDF bytes, caching result across Streamlit reruns."""
+    docs, _, _, _, _, err = load_single_pdf(file_bytes=file_bytes, filename=file_name, enable_ocr=enable_ocr)
+    if err or not docs:
+        return []
+    return chunk_documents(docs, chunk_size=chunk_size, chunk_overlap=chunk_overlap, deduplicate=True)
 
 # ---------------------------------------------------------------------------
 # Streamlit Page Setup & Custom Styling
@@ -211,6 +241,15 @@ with st.sidebar:
         "OpenRouter": PROVIDER_OPENROUTER
     }
     selected_llm_provider = next(v for k, v in provider_map.items() if llm_choice.startswith(k))
+
+    # Fast Model Selector
+    available_models = DEFAULT_LLM_MODELS.get(selected_llm_provider, ["default"])
+    selected_llm_model = st.selectbox(
+        "Model Version",
+        options=available_models,
+        index=0,
+        help="Select the exact model for inference. Defaults to the fastest verified production model."
+    )
 
     # Direct provider instructions and portal links
     provider_links = {
@@ -381,49 +420,50 @@ if uploaded_files:
     if st.session_state.indexed_dataset_hash != dataset_hash:
         with st.spinner("Processing documents & building vector store..."):
             try:
-                # Initialize Embedding Model
-                embedding_model = get_embedding_model(
+                t0_embed = time.perf_counter()
+                # Initialize Embedding Model with isolated user key hashing
+                embed_key_hash = hashlib.sha256((embed_api_key or "").encode()).hexdigest() if embed_api_key else "none"
+                embedding_model = get_cached_embedding_model(
                     provider=selected_embed_provider,
+                    key_hash=embed_key_hash,
                     key=embed_api_key,
-                    allow_offline_fallback=True
+                    model_name=None
                 )
+                logger.info(f"Embedding model ready in {(time.perf_counter() - t0_embed)*1000:.1f}ms")
 
                 # Attempt to load persisted index from disk
+                t0_load = time.perf_counter()
                 loaded_faiss = load_faiss_index(storage_dir, dataset_hash, embedding_model)
 
                 if loaded_faiss is not None:
                     manager = FAISSIndexManager(vector_store=loaded_faiss, embeddings=embedding_model)
                     all_docs = manager.get_all_documents()
                     st.toast(f"⚡ Loaded persistent index from disk ({len(all_docs)} chunks)", icon="💾")
+                    logger.info(f"Loaded persistent index in {(time.perf_counter() - t0_load)*1000:.1f}ms")
                 else:
-                    # Ingest and extract text
-                    ingest_res = ingest_documents(
-                        valid_file_payloads,
-                        enable_ocr=enable_ocr
-                    )
+                    # Ingest and extract text with per-document caching
+                    t0_ingest = time.perf_counter()
+                    all_docs = []
+                    for name, b in valid_file_payloads:
+                        chunks = extract_and_chunk_pdf_bytes(
+                            file_bytes=b,
+                            file_name=name,
+                            enable_ocr=enable_ocr,
+                            chunk_size=chunk_size,
+                            chunk_overlap=chunk_overlap
+                        )
+                        all_docs.extend(chunks)
 
-                    if ingest_res.errors:
-                        for err in ingest_res.errors:
-                            st.warning(f"⚠️ {err}")
-
-                    if not ingest_res.documents:
+                    if not all_docs:
                         st.error("❌ No readable text could be extracted from the uploaded document(s). If this is a scanned document, enable OCR in the sidebar.")
                         st.stop()
 
-                    # Chunk documents preserving metadata
-                    all_docs = chunk_documents(
-                        ingest_res.documents,
-                        chunk_size=chunk_size,
-                        chunk_overlap=chunk_overlap,
-                        deduplicate=True
-                    )
-
-                    if not all_docs:
-                        st.error("❌ No valid text chunks were created.")
-                        st.stop()
+                    logger.info(f"Ingested and chunked {len(all_docs)} chunks in {(time.perf_counter() - t0_ingest)*1000:.1f}ms")
 
                     # Build FAISS vector store
+                    t0_faiss = time.perf_counter()
                     manager = FAISSIndexManager.from_documents(all_docs, embedding_model)
+                    logger.info(f"Built FAISS index in {(time.perf_counter() - t0_faiss)*1000:.1f}ms")
 
                     # Persist index to disk
                     save_metadata = {
@@ -439,7 +479,7 @@ if uploaded_files:
                 # Build BM25 index for Hybrid Search
                 bm25_idx = BM25Index(all_docs)
 
-                # Initialize unified NoteBotRetriever
+                # Initialize unified NoteBotRetriever (reranker is lazily loaded)
                 reranker_instance = Reranker() if enable_reranker else None
                 st.session_state.retriever_instance = NoteBotRetriever(
                     index_manager=manager,
@@ -529,6 +569,8 @@ if uploaded_files:
         # Generate Assistant Response
         with st.chat_message("assistant"):
             try:
+                t_query_start = time.perf_counter()
+
                 # 1. Resolve search query (zero-latency heuristic anchor)
                 retrieval_query = resolve_search_query_heuristic(
                     st.session_state.chat_manager.get_messages(),
@@ -536,6 +578,7 @@ if uploaded_files:
                 )
 
                 # 2. Retrieve relevant documents using chosen strategy
+                t0_retrieval = time.perf_counter()
                 retriever: NoteBotRetriever = st.session_state.retriever_instance
                 retrieved_chunks = retriever.retrieve(
                     query=retrieval_query,
@@ -543,6 +586,7 @@ if uploaded_files:
                     mode=mode_key,
                     enable_reranker=enable_reranker
                 )
+                t_retrieval = time.perf_counter() - t0_retrieval
 
                 # 3. Stream Response
                 stream_gen = stream_rag_response(
@@ -550,10 +594,16 @@ if uploaded_files:
                     api_key=llm_api_key,
                     query=clean_query,
                     documents=retrieved_chunks,
-                    chat_history=st.session_state.chat_manager.get_messages()
+                    chat_history=st.session_state.chat_manager.get_messages(),
+                    model_override=selected_llm_model
                 )
 
                 full_response = st.write_stream(stream_gen)
+                t_total_response = time.perf_counter() - t_query_start
+                logger.info(
+                    f"RAG query completed in {t_total_response:.3f}s "
+                    f"(Retrieval: {t_retrieval*1000:.1f}ms, Provider: {selected_llm_provider}, Model: {selected_llm_model})"
+                )
 
                 # 4. Source Attribution & Grounding Verification
                 source_records = [
@@ -583,9 +633,12 @@ if uploaded_files:
 
                 # Grounding check
                 grounding_check = verify_answer_groundedness(full_response, retrieved_chunks)
+                grounding_badge = ""
                 if grounding_check["verified_citations"]:
                     verified_count = len(grounding_check["verified_citations"])
-                    st.caption(f"🛡️ **Grounded Answer**: Verified {verified_count} document citation(s).")
+                    grounding_badge = f" &bull; 🛡️ Verified {verified_count} citation(s)"
+
+                st.caption(f"⚡ Responded in **{t_total_response:.2f}s** (Retrieval: {t_retrieval*1000:.0f}ms){grounding_badge}")
 
                 # Store response in chat memory
                 st.session_state.chat_manager.add_assistant_message(full_response, sources=source_records)

@@ -1,6 +1,7 @@
 """Provider Configuration, Validation, and Model Management for NoteBot."""
 
 import os
+import hashlib
 from typing import Optional, List, Tuple, Any
 from notebot.config.settings import (
     PROVIDER_GOOGLE,
@@ -60,6 +61,10 @@ def validate_provider_key(provider: str, key: Optional[str]) -> Tuple[bool, Opti
     return True, None
 
 
+# In-memory thread-safe client cache to avoid recreating HTTP sessions & TLS handshakes per turn
+_LLM_CLIENT_CACHE = {}
+
+
 def get_llm_instance(
     provider: str,
     model_name: str,
@@ -69,57 +74,74 @@ def get_llm_instance(
     streaming: bool = True
 ) -> Any:
     """
-    Instantiates an LLM instance for inference.
+    Instantiates an LLM instance for inference with bounded timeouts and retries.
+    Caches client instances per (provider, model, key_hash) to avoid TLS handshake overhead.
     """
+    key_hash = hashlib.sha256(key.encode("utf-8")).hexdigest() if key else "no_key"
+    cache_key = (provider.lower(), model_name, key_hash, float(temperature), int(max_tokens), bool(streaming))
+    if cache_key in _LLM_CLIENT_CACHE:
+        return _LLM_CLIENT_CACHE[cache_key]
+
     prov = provider.lower()
 
     if prov == PROVIDER_GOOGLE:
         if not HAS_GOOGLE:
             raise ImportError("Package 'langchain-google-genai' is required for Google Gemini.")
-        return ChatGoogleGenerativeAI(
+        client = ChatGoogleGenerativeAI(
             model=model_name,
             google_api_key=key,
             temperature=temperature,
             max_output_tokens=max_tokens,
-            streaming=streaming
+            streaming=streaming,
+            timeout=30.0,
+            max_retries=2
         )
 
     elif prov == PROVIDER_GROQ:
         if not HAS_GROQ:
             raise ImportError("Package 'langchain-groq' is required for Groq models.")
-        return ChatGroq(
+        client = ChatGroq(
             model=model_name,
             groq_api_key=key,
             temperature=temperature,
             max_tokens=max_tokens,
-            streaming=streaming
+            streaming=streaming,
+            timeout=30.0,
+            max_retries=2
         )
 
     elif prov == PROVIDER_OPENROUTER:
         if not HAS_OPENAI:
             raise ImportError("Package 'langchain-openai' is required for OpenRouter.")
-        return ChatOpenAI(
+        client = ChatOpenAI(
             api_key=key,
             base_url="https://openrouter.ai/api/v1",
             model=model_name,
             temperature=temperature,
             max_tokens=max_tokens,
-            streaming=streaming
+            streaming=streaming,
+            timeout=30.0,
+            max_retries=2
         )
 
     elif prov == PROVIDER_OPENAI:
         if not HAS_OPENAI:
             raise ImportError("Package 'langchain-openai' is required for OpenAI models.")
-        return ChatOpenAI(
+        client = ChatOpenAI(
             api_key=key,
             model=model_name,
             temperature=temperature,
             max_tokens=max_tokens,
-            streaming=streaming
+            streaming=streaming,
+            timeout=30.0,
+            max_retries=2
         )
 
     else:
         raise ValueError(f"Unsupported provider: '{provider}'")
+
+    _LLM_CLIENT_CACHE[cache_key] = client
+    return client
 
 
 def classify_api_error(error: Exception) -> str:

@@ -33,6 +33,18 @@ except ImportError:
     HAS_FASTEMBED = False
 
 
+_CACHED_FASTEMBED = {}
+
+
+def _get_fastembed_instance(model_name: str = "BAAI/bge-small-en-v1.5") -> Any:
+    """Returns a cached FastEmbed instance to eliminate ONNX runtime reload overhead."""
+    if not HAS_FASTEMBED:
+        raise ImportError("Package 'fastembed' is required for local offline embeddings.")
+    if model_name not in _CACHED_FASTEMBED:
+        _CACHED_FASTEMBED[model_name] = FastEmbedEmbeddings(model_name=model_name)
+    return _CACHED_FASTEMBED[model_name]
+
+
 class ResilientGoogleEmbeddings(Embeddings):
     """
     Self-healing Google Gemini embeddings wrapper.
@@ -84,7 +96,7 @@ class ResilientGoogleEmbeddings(Embeddings):
                 f"All Google Gemini embedding models failed or unavailable ({last_err}). "
                 "Engaging local offline FastEmbed (BAAI/bge-small-en-v1.5) fallback."
             )
-            fallback = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
+            fallback = _get_fastembed_instance("BAAI/bge-small-en-v1.5")
             self._active_embedder = fallback
             self.active_model_name = "fastembed-offline-fallback"
             return fallback
@@ -159,7 +171,7 @@ class ResilientOpenAIEmbeddings(Embeddings):
 
         if self.allow_offline_fallback and HAS_FASTEMBED:
             logger.warning(f"OpenAI embedding failed ({last_err}); falling back to local FastEmbed.")
-            fallback = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
+            fallback = _get_fastembed_instance("BAAI/bge-small-en-v1.5")
             self._active_embedder = fallback
             self.active_model_name = "fastembed-offline-fallback"
             return fallback
@@ -234,8 +246,8 @@ def get_embedding_model(
         if not HAS_FASTEMBED:
             raise ImportError("Package 'fastembed' is required for local offline embeddings.")
         chosen_model = model_name or DEFAULT_EMBED_MODELS[EMBED_FASTEMBED][0]
-        logger.info(f"Initialized local FastEmbed model: {chosen_model}")
-        return FastEmbedEmbeddings(model_name=chosen_model)
+        logger.info(f"Using cached local FastEmbed model: {chosen_model}")
+        return _get_fastembed_instance(chosen_model)
 
     else:
         raise ValueError(f"Unsupported embedding provider: '{provider}'. Supported: google, openai, fastembed.")

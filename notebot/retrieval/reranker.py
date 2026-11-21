@@ -15,19 +15,28 @@ except ImportError:
     HAS_FLASHRANK = False
 
 
+_CACHED_RANKERS = {}
+
+
 class Reranker:
-    """Manages cross-encoder reranking over retrieved candidate documents."""
+    """Manages cross-encoder reranking over retrieved candidate documents with lazy initialization."""
 
     def __init__(self, model_name: str = "ms-marco-TinyBERT-L-2-v2"):
         self.model_name = model_name
-        self._ranker = None
-        if HAS_FLASHRANK:
+
+    def _get_ranker(self):
+        """Lazily instantiates and caches the FlashRank model singleton."""
+        if not HAS_FLASHRANK:
+            return None
+        if self.model_name not in _CACHED_RANKERS:
             try:
                 cache_dir = os.path.join(tempfile.gettempdir(), "flashrank")
-                self._ranker = Ranker(model_name=model_name, cache_dir=cache_dir)
-                logger.info(f"Initialized FlashRank model: {model_name}")
+                _CACHED_RANKERS[self.model_name] = Ranker(model_name=self.model_name, cache_dir=cache_dir)
+                logger.info(f"Initialized FlashRank model: {self.model_name}")
             except Exception as e:
                 logger.warning(f"Could not initialize FlashRank: {e}")
+                return None
+        return _CACHED_RANKERS.get(self.model_name)
 
     def rerank(self, query: str, documents: List[Document], top_n: int = 4) -> List[Document]:
         """
@@ -37,7 +46,8 @@ class Reranker:
         if not documents:
             return []
 
-        if not HAS_FLASHRANK or not self._ranker:
+        ranker = self._get_ranker()
+        if not ranker:
             # Fallback: pass-through without modification
             return documents[:top_n]
 
@@ -52,7 +62,7 @@ class Reranker:
             ]
 
             request = RerankRequest(query=query, passages=passages)
-            results = self._ranker.rerank(request)
+            results = ranker.rerank(request)
 
             reranked_docs = []
             for item in results[:top_n]:
